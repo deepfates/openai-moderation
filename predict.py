@@ -20,7 +20,6 @@ logger = logging.getLogger(__name__)
 
 class CategoryResult(BaseModel):
     category: str
-    is_flagged: bool
     score: float
 
 
@@ -144,7 +143,7 @@ class Predictor(BasePredictor):
                 if is_flagged:
                     categories.append(
                         CategoryResult(
-                            category=category, is_flagged=is_flagged, score=score
+                            category=category, score=score
                         )
                     )
 
