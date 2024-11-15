@@ -10,12 +10,13 @@ from openai import OpenAI
 from PIL import Image
 import logging
 import time
-import functools
 import zipfile
-import io
 import os
 
 logger = logging.getLogger(__name__)
+
+# Define constants
+MODERATION_MODEL = "omni-moderation-latest"
 
 
 class CategoryResult(BaseModel):
@@ -76,7 +77,7 @@ class Predictor(BasePredictor):
                     try:
                         image = Image.open(BytesIO(image_data)).convert("RGB")
                         images.append((filename, image))
-                    except Exception as e:
+                    except IOError as e:  # Specific exception handling
                         logger.error(f"Failed to open {filename}: {e}")
         return images
 
@@ -97,7 +98,7 @@ class Predictor(BasePredictor):
             time_taken=time_taken,
         )
 
-    async def run_safety_checker(self, image: Image.Image):
+    async def run_safety_checker(self, image: Image.Image) -> Tuple[bool, float, List[CategoryResult]]:
         try:
             start_time = time.time()
             buffered = BytesIO()
@@ -112,16 +113,9 @@ class Predictor(BasePredictor):
                 }
             ]
 
-            # Use functools.partial to pass keyword arguments
-            create_moderation = functools.partial(
-                self.client.moderations.create,
-                input=moderation_input,
-                model="omni-moderation-latest",
-            )
-
             # Call the moderation endpoint asynchronously
             response = await asyncio.get_event_loop().run_in_executor(
-                None, create_moderation
+                None, lambda: self.client.moderations.create(input=moderation_input, model=MODERATION_MODEL)
             )
 
             end_time = time.time()
