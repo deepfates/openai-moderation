@@ -81,15 +81,26 @@ class Predictor(BasePredictor):
                         logger.error(f"Failed to open {filename}: {e}")
         return images
 
+
     async def _predict_async(self, images: List[Tuple[str, Image.Image]]) -> List[SafetyCheckResult]:
+        # Limit the number of concurrent tasks using a semaphore
+        semaphore = asyncio.Semaphore(5)  # Seems like this is the undocumented rate limit at the other end
+
         tasks = [
-            self.process_image(filename, image) for filename, image in images
+            self.process_image(semaphore, filename, image)
+            for filename, image in images
         ]
         results = await asyncio.gather(*tasks)
         return results
 
-    async def process_image(self, filename: str, image: Image.Image) -> SafetyCheckResult:
-        is_safe, time_taken, categories = await self.run_safety_checker(image)
+    async def process_image(
+        self,
+        semaphore: asyncio.Semaphore,
+        filename: str,
+        image: Image.Image
+    ) -> SafetyCheckResult:
+        async with semaphore:
+            is_safe, time_taken, categories = await self.run_safety_checker(image)
 
         return SafetyCheckResult(
             image_filename=filename,
