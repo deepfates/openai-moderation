@@ -50,7 +50,7 @@ class Predictor(BasePredictor):
     def setup(self) -> None:
         pass
 
-    async def predict(
+    def predict(
         self,
         images_zip: Path = Input(
             description="Optional ZIP file containing images to run safety checks on",
@@ -150,7 +150,9 @@ class Predictor(BasePredictor):
             raise ValueError("No valid inputs provided.")
 
         # Run moderation on all inputs asynchronously
-        results = await self._predict_async(moderation_inputs, input_references, input_types)
+        results = asyncio.run(
+            self._predict_async(moderation_inputs, input_references, input_types)
+        )
 
         # Calculate total and average time based on individual input times
         total_time_taken = sum(result["time_taken"] for result in results)
