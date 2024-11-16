@@ -48,10 +48,13 @@ Icon
 .com.apple.timemachine.donotpresent
 
 
-# ZIP files and images
+# Test files
 *.zip
 *.png
 *.jpg
 *.jpeg
 *.gif
 *.bmp
+*.json
+
+*tmp*
