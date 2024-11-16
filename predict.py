@@ -41,11 +41,11 @@ class Predictor(BasePredictor):
         self,
         images_zip: Path = Input(
             description="Optional ZIP file containing images to run safety checks on",
-            default=None
+            default=None,
         ),
         inputs: Path = Input(
             description="Optional JSON file of inputs, each can have 'text', 'image_url', or both",
-            default=None
+            default=None,
         ),
         api_key: Secret = Input(
             description="OpenAI API key",
@@ -66,18 +66,20 @@ class Predictor(BasePredictor):
             images = self._extract_images(images_zip)
             for filename, image in images:
                 img_str = self._image_to_base64(image)
-                moderation_inputs.append({
-                    "type": "image_url",
-                    "image_url": {"url": f"data:image/png;base64,{img_str}"},
-                })
+                moderation_inputs.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{img_str}"},
+                    }
+                )
                 input_references.append(filename)
-                input_types.append('image')
+                input_types.append("image")
 
         # Process inputs if provided
         if inputs is not None:
             try:
                 # Read the JSON content from the file
-                with open(inputs, 'r') as f:
+                with open(inputs, "r") as f:
                     inputs_list = json.load(f)
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse 'inputs' JSON: {e}")
@@ -87,45 +89,41 @@ class Predictor(BasePredictor):
                 return []
 
             for idx, item in enumerate(inputs_list):
-                if 'text' in item and 'image_url' in item:
+                if "text" in item and "image_url" in item:
                     # Create separate input objects for text and image_url
-                    input_obj_text = {
-                        "type": "text",
-                        "text": item['text']
-                    }
+                    input_obj_text = {"type": "text", "text": item["text"]}
                     moderation_inputs.append(input_obj_text)
-                    input_references.append(item['text'])
-                    input_types.append('text')
+                    input_references.append(item["text"])
+                    input_types.append("text")
 
                     input_obj_image = {
                         "type": "image_url",
-                        "image_url": {"url": item['image_url']}
+                        "image_url": {"url": item["image_url"]},
                     }
                     moderation_inputs.append(input_obj_image)
-                    input_references.append(item['image_url'])
-                    input_types.append('image')
-                elif 'text' in item:
-                    input_obj = {
-                        "type": "text",
-                        "text": item['text']
-                    }
+                    input_references.append(item["image_url"])
+                    input_types.append("image")
+                elif "text" in item:
+                    input_obj = {"type": "text", "text": item["text"]}
                     moderation_inputs.append(input_obj)
-                    input_references.append(item['text'])
-                    input_types.append('text')
-                elif 'image_url' in item:
+                    input_references.append(item["text"])
+                    input_types.append("text")
+                elif "image_url" in item:
                     input_obj = {
                         "type": "image_url",
-                        "image_url": {"url": item['image_url']}
+                        "image_url": {"url": item["image_url"]},
                     }
                     moderation_inputs.append(input_obj)
-                    input_references.append(item['image_url'])
-                    input_types.append('image')
+                    input_references.append(item["image_url"])
+                    input_types.append("image")
                 else:
                     logger.warning(f"No valid input in item at index {idx}")
                     continue  # Skip if no valid input
 
         # Run moderation on all inputs asynchronously
-        results = asyncio.run(self._predict_async(moderation_inputs, input_references, input_types))
+        results = asyncio.run(
+            self._predict_async(moderation_inputs, input_references, input_types)
+        )
 
         end_time = time.time()
         print(f"Total processing time: {end_time - start_time:.2f} seconds")
@@ -134,13 +132,13 @@ class Predictor(BasePredictor):
 
     def _extract_images(self, images_zip: Path) -> List[Tuple[str, Image.Image]]:
         images = []
-        with zipfile.ZipFile(images_zip, 'r') as zip_ref:
+        with zipfile.ZipFile(images_zip, "r") as zip_ref:
             for filename in zip_ref.namelist():
                 # Skip directories and macOS metadata files
                 if (
-                    filename.endswith('/')
-                    or filename.startswith('__MACOSX/')
-                    or os.path.basename(filename).startswith('._')
+                    filename.endswith("/")
+                    or filename.startswith("__MACOSX/")
+                    or os.path.basename(filename).startswith("._")
                 ):
                     continue
                 with zip_ref.open(filename) as file:
@@ -162,14 +160,16 @@ class Predictor(BasePredictor):
         self,
         moderation_inputs: List[Dict[str, Any]],
         input_references: List[str],
-        input_types: List[str]
+        input_types: List[str],
     ) -> List[SafetyCheckResult]:
         # Limit the number of concurrent tasks using a semaphore
         semaphore = asyncio.Semaphore(5)  # Adjust based on rate limits
 
         tasks = [
             self.process_input(semaphore, input_obj, reference, input_type)
-            for input_obj, reference, input_type in zip(moderation_inputs, input_references, input_types)
+            for input_obj, reference, input_type in zip(
+                moderation_inputs, input_references, input_types
+            )
         ]
         results = await asyncio.gather(*tasks)
         return results
@@ -179,7 +179,7 @@ class Predictor(BasePredictor):
         semaphore: asyncio.Semaphore,
         input_obj: Dict[str, Any],
         reference: str,
-        input_type: str
+        input_type: str,
     ) -> SafetyCheckResult:
         async with semaphore:
             is_safe, time_taken, categories = await self.run_safety_checker(input_obj)
@@ -189,10 +189,12 @@ class Predictor(BasePredictor):
             is_safe=is_safe,
             categories=categories,
             time_taken=time_taken,
-            input_type=input_type
+            input_type=input_type,
         )
 
-    async def run_safety_checker(self, input_obj: Dict[str, Any]) -> Tuple[bool, float, List[CategoryResult]]:
+    async def run_safety_checker(
+        self, input_obj: Dict[str, Any]
+    ) -> Tuple[bool, float, List[CategoryResult]]:
         try:
             start_time = time.time()
 
@@ -200,7 +202,10 @@ class Predictor(BasePredictor):
 
             # Call the moderation endpoint asynchronously
             response = await asyncio.get_event_loop().run_in_executor(
-                None, lambda: self.client.moderations.create(input=moderation_input, model=MODERATION_MODEL)
+                None,
+                lambda: self.client.moderations.create(
+                    input=moderation_input, model=MODERATION_MODEL
+                ),
             )
 
             end_time = time.time()
@@ -220,11 +225,7 @@ class Predictor(BasePredictor):
                 is_flagged = getattr(categories_obj, category)
                 score = getattr(scores_obj, category)
                 if is_flagged:
-                    categories.append(
-                        CategoryResult(
-                            category=category, score=score
-                        )
-                    )
+                    categories.append(CategoryResult(category=category, score=score))
 
             return is_safe, end_time - start_time, categories
 
